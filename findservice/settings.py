@@ -30,6 +30,15 @@ ALLOWED_HOSTS = ['*']
 
 CORS_ALLOW_ALL_ORIGINS = True  # Permite solicitudes desde cualquier origen
 
+
+
+# Configurar WebSockets para permitir conexiones desde cualquier dominio
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Permitir WebSockets y peticiones desde el frontend
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://10.0.2.2:8000']
+
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -41,7 +50,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
+    'django.contrib.gis',
     'api',
+    'channels',
+    'chat',
+    'reservas'
     
 ]
 
@@ -82,7 +96,7 @@ WSGI_APPLICATION = 'findservice.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': os.environ.get('DB_NAME', 'postgres'),
         'USER': os.environ.get('DB_USER', 'postgres.zjlbyjyofywolmaaguce'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'appuber123.'),
@@ -132,3 +146,34 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = 'api.CustomUser'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', 'C:/OSGeo4W/bin/gdal310.dll')
+
+ASGI_APPLICATION = "findservice.asgi.application"
+
+# Configuración de Channels y Redis para WebSockets
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",  # Usar Redis en producción
+    },
+}
+
+"""
+para usar redis
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+"""
