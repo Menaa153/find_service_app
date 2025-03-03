@@ -4,7 +4,6 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Producto, CustomUser
 from .serializer import ProductoSerializer
-
 from rest_framework.response import Response
 from .serializer import RegisterSerializer, UserSerializer
 from rest_framework import status, generics
@@ -12,12 +11,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
-
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
-
-
-
+from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
+from .serializer import ChangePasswordSerializer
+from geopy.geocoders import Nominatim
 
 
 
@@ -30,6 +29,16 @@ class RegisterView(generics.CreateAPIView):
 class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.all()
     serializer_class = ProductoSerializer
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Contraseña cambiada exitosamente."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 """
 @api_view(['POST'])
@@ -77,7 +86,16 @@ def cambiar_rol(request):
     
 
 
-
+# Función para obtener el barrio
+def obtener_barrio(lat, lon):
+    geolocator = Nominatim(user_agent="mi_aplicacion")
+    location = geolocator.reverse((lat, lon), exactly_one=True)
+    
+    if location:
+        direccion = location.raw.get("address", {})
+        barrio = direccion.get("suburb") or direccion.get("neighbourhood") or "Barrio no encontrado"
+        return barrio
+    return "No se pudo obtener el barrio"
 
 @api_view(['GET'])
 def buscar_prestadores_cercanos(request):
@@ -105,8 +123,9 @@ def buscar_prestadores_cercanos(request):
             "username": p.first_name,
             "email": p.email,
             "categoria": p.categoria,
-            "distancia_km": p.distancia.km,
+            "distancia_km": obtener_barrio(p.location.y, p.location.x),
             "descripcion": p.descripcion
+            
         } 
         for p in prestadores
     ]
@@ -145,11 +164,41 @@ def convertir_a_prestador(request):
 def obtener_perfil(request):
     user = request.user
     return Response({
-        "username": user.first_name,
+        "nombre": user.first_name,
         "apellido": user.last_name,
         "email": user.email,
         "telefono": user.phone,
         "role": user.role,
         "descripcion" : user.descripcion,
-        "ubicacion" : user.ubicacion,
+        #"ubicacion" : user.location,
+        "profile_picture": user.profile_picture.url if user.profile_picture else None,  # Añadir la imagen de perfil
     })
+
+
+
+
+
+
+class DeleteAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        user.delete()
+        return Response({"message": "Cuenta eliminada exitosamente."}, status=204)
+
+
+
+class UploadProfilePicture(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        if 'profile_picture' in request.FILES:
+            profile_picture = request.FILES['profile_picture']
+            user.profile_picture = profile_picture
+            user.save()
+            return Response({"message": "Foto de perfil actualizada"})
+        return Response({"error": "No se ha enviado ninguna imagen"}, status=400)
+

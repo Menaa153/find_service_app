@@ -177,3 +177,8 @@ CHANNEL_LAYERS = {
     },
 }
 """
+
+
+# Configura la ruta para los archivos estáticos y de medios
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
